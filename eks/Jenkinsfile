@@ -1,4 +1,6 @@
 pipeline{
+    agent any
+
     parameters{
         choice(name: 'terraformAction',choices: ['apply','destroy'],description: 'Choose your terraform action')
     }
@@ -7,66 +9,61 @@ pipeline{
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
     }
-
-    agent any
-
+    
     stages{
         stage('Checkout'){
             steps{
-                script{
-                    dir("terraform"){
-                        git url: 'https://github.com/afeef96867-hub/Itkannadigaru-chatbot.git',branch: 'Iac-devenv'
-                    }
+                dir("terraform"){
+                    git url: 'https://github.com/afeef96867-hub/Itkannadigaru-chatbot.git', branch: 'Iac-devenv'
                 }
             }
         }
 
-        stage('Plan'){
+        stage('Terraform Init'){
             steps{
-                sh 'pwd; cd eks/; terraform init'
-                sh 'pwd; cd eks/; terraform plan -out tfplan'
-                sh 'pwd; cd eks/; terraform show -no-color tfplan > tfplan.txt'
+                sh 'cd terraform/eks && terraform init'
+            }
+        }
+
+        stage('Terraform Plan'){
+            steps{
+                sh 'cd terraform/eks && terraform plan -out tfplan'
+                sh 'cd terraform/eks && terraform show -no-color tfplan > tfplan.txt'
             }
         }
 
         stage('Approval'){
             steps{
                 script{
-                    def plan = readFile 'eks/tfplan.txt'
-                    input message: "Do you want to proceed with the Terraform action?",
-                    parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
+                    def plan = readFile 'terraform/eks/tfplan.txt'
+                    input message: "Do you want to proceed?",
+                    parameters: [text(name: 'Plan', defaultValue: plan)]
                 }
             }
         }
 
-        stage('Apply or Destroy'){
-            when {
-                expression{
-                    return  params.terraformAction == 'apply' || params.terraformAction == 'destroy'
-                } 
-            }
+        stage('Apply or Destroy'){          
             steps{
                 script{
                     if (params.terraformAction == 'apply'){
-                        sh 'pwd; cd eks/; terraform apply -input=false tfplan'
-                    }
-                    else if (params.terraformAction == 'destroy'){
-                        sh 'pwd; cd eks/; terraform destroy -auto-approve'
+                        sh 'cd terraform/eks && terraform apply -input=false tfplan'
+                    } else {
+                        sh 'cd terraform/eks && terraform destroy -auto-approve'
                     }
                 }
             }
         }
+
         stage('Backup-stage'){
             steps{
                 sh '''
                 export PATH=$PATH:/snap/bin
-                pwd
-                cd eks/
-                aws s3 cp terraform.tfstate s3://itkannadogaru-terraform-tf-backup/chat-bot/dev-eks/
+                cd terraform/eks
+                aws s3 cp terraform.tfstate s3://itkannadogaru-terraform-tf-backup/chat-bot/dev-eks/terraform.tfstate
                 '''
             }
         }
     }
-
+    
 }
 
