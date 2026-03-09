@@ -63,7 +63,7 @@ pipeline{
                 export PATH=$PATH:/snap/bin
                 pwd
                 cd eks/
-                aws s3 cp terraform.tfstate s3://itkannadigaru-terraform-tf-backup/chat-bot/dev-eks/
+                aws s3 cp terraform.tfstate s3://itkannadigaru-terraform-tf-backup1/chat-bot/dev-eks/
                 '''
             }
         }
